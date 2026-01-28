@@ -95,15 +95,23 @@
                     try {
                         const hints = await navigator.userAgentData.getHighEntropyValues(['model', 'platformVersion']);
                         device = hints.model || 'Android Device';
-                        model = hints.model || 'Android Device';
+                        
+                        // Model을 postback 형태로 (iOS의 CPU... 형식처럼)
+                        if (hints.model) {
+                            // "Linux; Android 14; SM-G991N" 형태로
+                            model = `Linux; Android ${hints.platformVersion || osVersion}; ${hints.model}`;
+                        } else {
+                            model = `Linux; Android ${osVersion}; Unknown`;
+                        }
+                        
                         if (hints.platformVersion) osVersion = hints.platformVersion;
                     } catch (e) {
                         device = 'Android Device';
-                        model = 'Android Device';
+                        model = `Linux; Android ${osVersion}; Unknown`;
                     }
                 } else {
                     device = 'Android Device';
-                    model = 'Android Device';
+                    model = `Linux; Android ${osVersion}; Unknown`;
                 }
             }
 
