@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Device Info</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     <style>
         body { 
             margin: 0; 
@@ -51,81 +53,144 @@
         .small {
             font-size: 12px;
         }
-        .ua {
-            font-size: 11px;
-            color: #999;
-            margin-top: 20px;
-            word-break: break-all;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 5px;
+        .session-code {
+            background: #667eea;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 5px;
+            margin: 20px 0;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>📱 Device Information</h1>
-        
-        <div class="info-item">
-            <div class="label">Device Model</div>
-            <div class="value" id="device">Loading...</div>
-        </div>
-        
-        <div class="info-item">
-            <div class="label">OS Version</div>
-            <div class="value" id="os-version">Loading...</div>
-        </div>
-        
-        <div class="info-item">
-            <div class="label">Model (for MMP postback)</div>
-            <div class="value small" id="model">Loading...</div>
-        </div>
-        
-        <div class="info-item">
-            <div class="label">Model (URL encoded)</div>
-            <div class="value small" id="model-encoded">Loading...</div>
-        </div>
-        
-        <div class="ua">
-            <strong>Full User Agent:</strong><br>
-            <span id="ua"></span>
-        </div>
-    </div>
+    <div class="container" id="content"></div>
 
     <script>
-        const ua = navigator.userAgent;
-        let device = 'Unknown', osVersion = 'Unknown', model = 'Unknown';
+        const firebaseConfig = {
+            apiKey: "여기에-복사한-값",
+            authDomain: "여기에-복사한-값",
+            databaseURL: "여기에-복사한-값",
+            projectId: "여기에-복사한-값"
+        };
 
-        // iOS
-        if (/iPhone/.test(ua)) {
-            device = 'iPhone';
-            
-            // OS Version: 18.6.2
-            const osMatch = /iPhone OS (\d+_\d+_?\d*)/.exec(ua);
-            osVersion = osMatch ? osMatch[1].replace(/_/g, '.') : 'Unknown';
-            
-            // Model: CPU iPhone OS 18_6_2 like Mac OS X
-            const cpuMatch = /(CPU[^)]+)/.exec(ua);
-            model = cpuMatch ? cpuMatch[1] : 'Unknown';
-        } 
-        // Android
-        else if (/Android/.test(ua)) {
-            // OS Version
-            const versionMatch = /Android (\d+\.?\d*\.?\d*)/.exec(ua);
-            osVersion = versionMatch ? versionMatch[1] : 'Unknown';
-            
-            // Device Model: SM-G991N
-            const modelMatch = /; ([^;]+) Build/.exec(ua);
-            device = modelMatch ? modelMatch[1].trim() : 'Android Device';
-            model = device; // Android는 모델명이 곧 model 파라미터
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionCode = urlParams.get('session');
+
+        if (sessionCode) {
+            showPCMode(sessionCode);
+        } else {
+            showMobileMode();
         }
 
-        // Update UI
-        document.getElementById('device').textContent = device;
-        document.getElementById('os-version').textContent = osVersion;
-        document.getElementById('model').textContent = model;
-        document.getElementById('model-encoded').textContent = encodeURIComponent(model);
-        document.getElementById('ua').textContent = ua;
+        async function showMobileMode() {
+            const ua = navigator.userAgent;
+            let device = 'Unknown', osVersion = 'Unknown', model = 'Unknown';
+
+            if (/iPhone/.test(ua)) {
+                device = 'iPhone';
+                const osMatch = /iPhone OS (\d+_\d+_?\d*)/.exec(ua);
+                osVersion = osMatch ? osMatch[1].replace(/_/g, '.') : 'Unknown';
+                const cpuMatch = /(CPU[^)]+)/.exec(ua);
+                model = cpuMatch ? cpuMatch[1] : 'Unknown';
+            } 
+            else if (/Android/.test(ua)) {
+                const versionMatch = /Android (\d+\.?\d*\.?\d*)/.exec(ua);
+                osVersion = versionMatch ? versionMatch[1] : 'Unknown';
+                
+                // Client Hints로 실제 모델명 가져오기
+                if (navigator.userAgentData) {
+                    try {
+                        const hints = await navigator.userAgentData.getHighEntropyValues([
+                            'model',
+                            'platformVersion'
+                        ]);
+                        device = hints.model || 'Android Device';
+                        model = hints.model || 'Android Device';
+                        if (hints.platformVersion) {
+                            osVersion = hints.platformVersion;
+                        }
+                    } catch (e) {
+                        console.log('Client Hints failed:', e);
+                        device = 'Android Device';
+                        model = 'Android (User-Agent Reduced)';
+                    }
+                } else {
+                    device = 'Android Device';
+                    model = 'Android (Client Hints not supported)';
+                }
+            }
+
+            // Firebase에 데이터 저장
+            const sessionId = Date.now().toString().slice(-6);
+            database.ref('devices/' + sessionId).set({
+                device: device,
+                osVersion: osVersion,
+                model: model,
+                timestamp: Date.now()
+            });
+
+            // 화면 표시
+            document.getElementById('content').innerHTML = `
+                <h1>✅ Device Scanned</h1>
+                <div class="session-code">${sessionId}</div>
+                <p style="text-align:center; color:#666;">Enter this code on PC</p>
+                <div class="info-item">
+                    <div class="label">Device Model</div>
+                    <div class="value">${device}</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">OS Version</div>
+                    <div class="value">${osVersion}</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Model (for MMP postback)</div>
+                    <div class="value small">${model}</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Model (URL encoded)</div>
+                    <div class="value small">${encodeURIComponent(model)}</div>
+                </div>
+            `;
+        }
+
+        function showPCMode(code) {
+            document.getElementById('content').innerHTML = `
+                <h1>📱 Waiting for device...</h1>
+                <p style="text-align:center; color:#666;">Session: ${code}</p>
+                <div id="device-data"></div>
+            `;
+
+            database.ref('devices/' + code).on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    document.getElementById('device-data').innerHTML = `
+                        <div class="info-item">
+                            <div class="label">Device Model</div>
+                            <div class="value">${data.device}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="label">OS Version</div>
+                            <div class="value">${data.osVersion}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="label">Model (for MMP postback)</div>
+                            <div class="value small">${data.model}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="label">Model (URL encoded)</div>
+                            <div class="value small">${encodeURIComponent(data.model)}</div>
+                        </div>
+                    `;
+                }
+            });
+        }
     </script>
 </body>
 </html>
