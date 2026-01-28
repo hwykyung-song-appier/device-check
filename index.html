@@ -20,7 +20,7 @@
             padding: 40px;
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            max-width: 500px;
+            max-width: 600px;
             width: 100%;
         }
         h1 { 
@@ -39,14 +39,20 @@
             font-size: 14px;
             color: #666;
             margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         .value {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
             color: #333;
+            word-break: break-all;
+        }
+        .small {
+            font-size: 12px;
         }
         .ua {
-            font-size: 12px;
+            font-size: 11px;
             color: #999;
             margin-top: 20px;
             word-break: break-all;
@@ -58,36 +64,68 @@
 </head>
 <body>
     <div class="container">
-        <h1>📱 기기 정보</h1>
+        <h1>📱 Device Information</h1>
+        
         <div class="info-item">
-            <div class="label">기기 모델</div>
+            <div class="label">Device Model</div>
             <div class="value" id="device">Loading...</div>
         </div>
+        
         <div class="info-item">
-            <div class="label">OS 버전</div>
-            <div class="value" id="os">Loading...</div>
+            <div class="label">OS Version</div>
+            <div class="value" id="os-version">Loading...</div>
         </div>
-        <div class="ua" id="ua"></div>
+        
+        <div class="info-item">
+            <div class="label">Model (for MMP postback)</div>
+            <div class="value small" id="model">Loading...</div>
+        </div>
+        
+        <div class="info-item">
+            <div class="label">Model (URL encoded)</div>
+            <div class="value small" id="model-encoded">Loading...</div>
+        </div>
+        
+        <div class="ua">
+            <strong>Full User Agent:</strong><br>
+            <span id="ua"></span>
+        </div>
     </div>
 
     <script>
         const ua = navigator.userAgent;
-        let device = 'Unknown', os = 'Unknown';
+        let device = 'Unknown', osVersion = 'Unknown', model = 'Unknown';
 
+        // iOS
         if (/iPhone/.test(ua)) {
             device = 'iPhone';
-            const match = /iPhone OS (\d+_\d+)/.exec(ua);
-            os = 'iOS ' + (match ? match[1].replace('_', '.') : '?');
-        } else if (/Android/.test(ua)) {
-            const versionMatch = /Android (\d+\.?\d*)/.exec(ua);
-            os = 'Android ' + (versionMatch ? versionMatch[1] : '?');
+            
+            // OS Version: 18.6.2
+            const osMatch = /iPhone OS (\d+_\d+_?\d*)/.exec(ua);
+            osVersion = osMatch ? osMatch[1].replace(/_/g, '.') : 'Unknown';
+            
+            // Model: CPU iPhone OS 18_6_2 like Mac OS X
+            const cpuMatch = /(CPU[^)]+)/.exec(ua);
+            model = cpuMatch ? cpuMatch[1] : 'Unknown';
+        } 
+        // Android
+        else if (/Android/.test(ua)) {
+            // OS Version
+            const versionMatch = /Android (\d+\.?\d*\.?\d*)/.exec(ua);
+            osVersion = versionMatch ? versionMatch[1] : 'Unknown';
+            
+            // Device Model: SM-G991N
             const modelMatch = /; ([^;]+) Build/.exec(ua);
-            device = modelMatch ? modelMatch[1] : 'Android Device';
+            device = modelMatch ? modelMatch[1].trim() : 'Android Device';
+            model = device; // Android는 모델명이 곧 model 파라미터
         }
 
+        // Update UI
         document.getElementById('device').textContent = device;
-        document.getElementById('os').textContent = os;
-        document.getElementById('ua').textContent = 'User Agent: ' + ua;
+        document.getElementById('os-version').textContent = osVersion;
+        document.getElementById('model').textContent = model;
+        document.getElementById('model-encoded').textContent = encodeURIComponent(model);
+        document.getElementById('ua').textContent = ua;
     </script>
 </body>
 </html>
