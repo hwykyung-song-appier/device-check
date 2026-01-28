@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Device Info</title>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     <style>
         body { 
             margin: 0; 
@@ -53,43 +51,31 @@
         .small {
             font-size: 12px;
         }
-        .session-code {
-            background: #667eea;
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            font-size: 32px;
-            font-weight: bold;
-            letter-spacing: 5px;
-            margin: 20px 0;
-        }
     </style>
 </head>
 <body>
-    <div class="container" id="content"></div>
+    <div class="container">
+        <h1>📱 Device Information</h1>
+        <div class="info-item">
+            <div class="label">Device Model</div>
+            <div class="value" id="device">Loading...</div>
+        </div>
+        <div class="info-item">
+            <div class="label">OS Version</div>
+            <div class="value" id="os-version">Loading...</div>
+        </div>
+        <div class="info-item">
+            <div class="label">Model (for MMP postback)</div>
+            <div class="value small" id="model">Loading...</div>
+        </div>
+        <div class="info-item">
+            <div class="label">Model (URL encoded)</div>
+            <div class="value small" id="model-encoded">Loading...</div>
+        </div>
+    </div>
 
     <script>
-        const firebaseConfig = {
-            apiKey: "여기에-복사한-값",
-            authDomain: "여기에-복사한-값",
-            databaseURL: "여기에-복사한-값",
-            projectId: "여기에-복사한-값"
-        };
-
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const sessionCode = urlParams.get('session');
-
-        if (sessionCode) {
-            showPCMode(sessionCode);
-        } else {
-            showMobileMode();
-        }
-
-        async function showMobileMode() {
+        async function getDeviceInfo() {
             const ua = navigator.userAgent;
             let device = 'Unknown', osVersion = 'Unknown', model = 'Unknown';
 
@@ -104,93 +90,30 @@
                 const versionMatch = /Android (\d+\.?\d*\.?\d*)/.exec(ua);
                 osVersion = versionMatch ? versionMatch[1] : 'Unknown';
                 
-                // Client Hints로 실제 모델명 가져오기
+                // Client Hints 시도
                 if (navigator.userAgentData) {
                     try {
-                        const hints = await navigator.userAgentData.getHighEntropyValues([
-                            'model',
-                            'platformVersion'
-                        ]);
+                        const hints = await navigator.userAgentData.getHighEntropyValues(['model', 'platformVersion']);
                         device = hints.model || 'Android Device';
                         model = hints.model || 'Android Device';
-                        if (hints.platformVersion) {
-                            osVersion = hints.platformVersion;
-                        }
+                        if (hints.platformVersion) osVersion = hints.platformVersion;
                     } catch (e) {
-                        console.log('Client Hints failed:', e);
                         device = 'Android Device';
-                        model = 'Android (User-Agent Reduced)';
+                        model = 'Android Device';
                     }
                 } else {
                     device = 'Android Device';
-                    model = 'Android (Client Hints not supported)';
+                    model = 'Android Device';
                 }
             }
 
-            // Firebase에 데이터 저장
-            const sessionId = Date.now().toString().slice(-6);
-            database.ref('devices/' + sessionId).set({
-                device: device,
-                osVersion: osVersion,
-                model: model,
-                timestamp: Date.now()
-            });
-
-            // 화면 표시
-            document.getElementById('content').innerHTML = `
-                <h1>✅ Device Scanned</h1>
-                <div class="session-code">${sessionId}</div>
-                <p style="text-align:center; color:#666;">Enter this code on PC</p>
-                <div class="info-item">
-                    <div class="label">Device Model</div>
-                    <div class="value">${device}</div>
-                </div>
-                <div class="info-item">
-                    <div class="label">OS Version</div>
-                    <div class="value">${osVersion}</div>
-                </div>
-                <div class="info-item">
-                    <div class="label">Model (for MMP postback)</div>
-                    <div class="value small">${model}</div>
-                </div>
-                <div class="info-item">
-                    <div class="label">Model (URL encoded)</div>
-                    <div class="value small">${encodeURIComponent(model)}</div>
-                </div>
-            `;
+            document.getElementById('device').textContent = device;
+            document.getElementById('os-version').textContent = osVersion;
+            document.getElementById('model').textContent = model;
+            document.getElementById('model-encoded').textContent = encodeURIComponent(model);
         }
 
-        function showPCMode(code) {
-            document.getElementById('content').innerHTML = `
-                <h1>📱 Waiting for device...</h1>
-                <p style="text-align:center; color:#666;">Session: ${code}</p>
-                <div id="device-data"></div>
-            `;
-
-            database.ref('devices/' + code).on('value', (snapshot) => {
-                const data = snapshot.val();
-                if (data) {
-                    document.getElementById('device-data').innerHTML = `
-                        <div class="info-item">
-                            <div class="label">Device Model</div>
-                            <div class="value">${data.device}</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="label">OS Version</div>
-                            <div class="value">${data.osVersion}</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="label">Model (for MMP postback)</div>
-                            <div class="value small">${data.model}</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="label">Model (URL encoded)</div>
-                            <div class="value small">${encodeURIComponent(data.model)}</div>
-                        </div>
-                    `;
-                }
-            });
-        }
+        getDeviceInfo();
     </script>
 </body>
 </html>
